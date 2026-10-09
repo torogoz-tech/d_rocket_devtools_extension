@@ -1,0 +1,22 @@
+name: d_rocket_devtools_extension_example
+description: Minimal Flutter app used to validate the d_rocket DevTools extension.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.17.0"
+
+dependencies:
+  d_rocket:
+    path: ../../d_rocket
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
