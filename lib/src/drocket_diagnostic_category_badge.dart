@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'drocket_diagnostic_category_style.dart';
+
 class DrocketDiagnosticCategoryBadge extends StatelessWidget {
   const DrocketDiagnosticCategoryBadge({
     super.key,
@@ -10,7 +12,7 @@ class DrocketDiagnosticCategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(category);
+    final color = diagnosticCategoryColor(category);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.18),
@@ -31,20 +33,4 @@ class DrocketDiagnosticCategoryBadge extends StatelessWidget {
     );
   }
 
-  Color _colorFor(String value) {
-    switch (value) {
-      case 'rest':
-        return Colors.blueAccent;
-      case 'database':
-        return Colors.deepPurpleAccent;
-      case 'migration':
-        return Colors.amber;
-      case 'sync':
-        return Colors.tealAccent;
-      case 'realtime':
-        return Colors.indigoAccent;
-      default:
-        return Colors.blueGrey;
-    }
-  }
 }

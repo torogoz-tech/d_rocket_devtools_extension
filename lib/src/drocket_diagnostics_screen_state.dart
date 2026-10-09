@@ -35,6 +35,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
         setState(() {
           events.insert(0, diagnostic);
           if (events.length > 500) events.removeLast();
+          _sortEventsByTimestamp();
         });
       });
     } catch (_) {
@@ -59,6 +60,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
             ..addAll(rawEvents.whereType<Map>().map(
                   (event) => event.cast<String, Object?>(),
                 ));
+          _sortEventsByTimestamp();
         });
       }
     } catch (value) {
@@ -84,6 +86,17 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   List<Map<String, Object?>> get visibleEvents => events
       .where((event) => filter == 'all' || event['category'] == filter)
       .toList(growable: false);
+
+  void _sortEventsByTimestamp() {
+    events.sort((left, right) {
+      final leftTime = DateTime.tryParse('${left['startedAt']}');
+      final rightTime = DateTime.tryParse('${right['startedAt']}');
+      if (leftTime == null && rightTime == null) return 0;
+      if (leftTime == null) return 1;
+      if (rightTime == null) return -1;
+      return rightTime.compareTo(leftTime);
+    });
+  }
 
   int get errorCount => events.where((event) => event['success'] == false).length;
 
@@ -114,6 +127,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
                 DropdownMenuItem(value: 'database', child: Text('Database')),
                 DropdownMenuItem(value: 'migration', child: Text('Migration')),
                 DropdownMenuItem(value: 'sync', child: Text('Sync')),
+                DropdownMenuItem(value: 'cache', child: Text('Cache')),
                 DropdownMenuItem(value: 'realtime', child: Text('Realtime')),
               ],
               onChanged: (value) => setState(() => filter = value ?? 'all'),
