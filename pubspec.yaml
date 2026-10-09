@@ -1,0 +1,20 @@
+name: d_rocket_devtools_extension
+description: DevTools extension for inspecting d_rocket runtime diagnostics.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.17.0"
+
+dependencies:
+  devtools_extensions: ^0.5.1
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
