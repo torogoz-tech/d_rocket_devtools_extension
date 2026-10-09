@@ -100,6 +100,11 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
           'Date and time',
           formatDiagnosticTimestamp(event['startedAt']),
         ),
+        _detail(
+          context,
+          'Finished at',
+          formatDiagnosticTimestamp(event['finishedAt']),
+        ),
         _detail(context, 'Duration', durationLabel),
         if (event['statusCode'] != null)
           _detail(context, 'HTTP status', '${event['statusCode']}'),
@@ -158,6 +163,11 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 7),
                 child: _detail(context, _labelFor(entry.key), '${entry.value}'),
               ),
+            ),
+          if (payload['bodyTruncated'] == true)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text('Body truncated by diagnostics payload limit.'),
             ),
         ],
       ),

@@ -12,18 +12,28 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   String filter = 'all';
   String? error;
   bool loading = true;
+  bool connected = false;
   StreamSubscription<dynamic>? eventSubscription;
 
   @override
   void initState() {
     super.initState();
+    serviceManager.connectedState.addListener(_handleConnectionStateChange);
+    connected = serviceManager.connectedState.value.connected;
     loadSnapshot();
     listenToDiagnosticEvents();
   }
 
+  void _handleConnectionStateChange() {
+    final next = serviceManager.connectedState.value.connected;
+    if (mounted) setState(() => connected = next);
+    if (next) listenToDiagnosticEvents();
+  }
+
   Future<void> listenToDiagnosticEvents() async {
     try {
-      final service = await serviceManager.onServiceAvailable;
+      final service = serviceManager.service ??
+          await serviceManager.onServiceAvailable;
       if (!mounted) return;
       await eventSubscription?.cancel();
       eventSubscription = service.onExtensionEvent.listen((event) {
@@ -32,6 +42,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
         if (data is! Map) return;
         final diagnostic = data.cast<String, Object?>();
         if (!mounted) return;
+        if (_hasEvent(diagnostic)) return;
         setState(() {
           events.insert(0, diagnostic);
           if (events.length > 500) events.removeLast();
@@ -41,6 +52,11 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     } catch (_) {
       // The refresh action remains available when VM Service is unavailable.
     }
+  }
+
+  bool _hasEvent(Map<String, Object?> candidate) {
+    final id = candidate['id'];
+    return id != null && events.any((event) => event['id'] == id);
   }
 
   Future<void> loadSnapshot() async {
@@ -80,6 +96,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   @override
   void dispose() {
     eventSubscription?.cancel();
+    serviceManager.connectedState.removeListener(_handleConnectionStateChange);
     super.dispose();
   }
 
@@ -116,6 +133,15 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
       appBar: AppBar(
         title: const Text('d_rocket diagnostics'),
         actions: <Widget>[
+          Tooltip(
+            message: connected ? 'Connected to VM Service' : 'Disconnected',
+            child: Icon(
+              Icons.circle,
+              size: 11,
+              color: connected ? Colors.greenAccent : Colors.redAccent,
+            ),
+          ),
+          const SizedBox(width: 12),
           SizedBox(
             width: 150,
             child: DropdownButton<String>(
