@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:devtools_extensions/devtools_extensions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'drocket_diagnostic_event_tile.dart';
 import 'drocket_diagnostic_metric_card.dart';
@@ -15,6 +17,9 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   String? error;
   bool loading = true;
   bool connected = false;
+  bool diagnosticsEnabled = false;
+  bool includeSensitiveData = false;
+  int bufferCapacity = 500;
   StreamSubscription<dynamic>? eventSubscription;
 
   @override
@@ -34,8 +39,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
 
   Future<void> listenToDiagnosticEvents() async {
     try {
-      final service = serviceManager.service ??
-          await serviceManager.onServiceAvailable;
+      final service =
+          serviceManager.service ?? await serviceManager.onServiceAvailable;
       if (!mounted) return;
       await eventSubscription?.cancel();
       eventSubscription = service.onExtensionEvent.listen((event) {
@@ -71,6 +76,14 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
         'ext.d_rocket.diagnostics.snapshot',
       );
       final dynamic rawEvents = response.json?['events'];
+      final dynamic rawBuffer = response.json?['buffer'];
+      final dynamic rawCapacity =
+          rawBuffer is Map ? rawBuffer['capacity'] : null;
+      final dynamic rawEnabled = response.json?['enabled'];
+      final dynamic rawSensitive = response.json?['includeSensitiveData'];
+      if (rawCapacity is num) bufferCapacity = rawCapacity.toInt();
+      if (rawEnabled is bool) diagnosticsEnabled = rawEnabled;
+      if (rawSensitive is bool) includeSensitiveData = rawSensitive;
       if (rawEvents is List) {
         setState(() {
           events
@@ -95,6 +108,50 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     setState(events.clear);
   }
 
+  Future<void> exportEvents() async {
+    await Clipboard.setData(
+      ClipboardData(
+          text: const JsonEncoder.withIndent('  ').convert(visibleEvents)),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Visible events copied to clipboard')),
+    );
+  }
+
+  Future<void> importEventsFromClipboard() async {
+    final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clipboard?.text;
+    if (text == null || text.trim().isEmpty) return;
+    final imported = <Map<String, Object?>>[];
+    for (final line in text.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      try {
+        final value = jsonDecode(trimmed);
+        if (value is Map) {
+          imported.add(value.cast<String, Object?>());
+        }
+      } on FormatException {
+        // Ignore non-event lines so a copied CLI log can be pasted safely.
+      }
+    }
+    if (imported.isEmpty) return;
+    setState(() {
+      for (final event in imported) {
+        if (!_hasEvent(event)) events.add(event);
+      }
+      if (events.length > bufferCapacity) {
+        events.removeRange(0, events.length - bufferCapacity);
+      }
+      _sortEventsByTimestamp();
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${imported.length} event(s) imported')),
+    );
+  }
+
   @override
   void dispose() {
     eventSubscription?.cancel();
@@ -103,10 +160,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     super.dispose();
   }
 
-  List<Map<String, Object?>> get visibleEvents => events
-      .where((event) {
-        final matchesCategory =
-            filter == 'all' || event['category'] == filter;
+  List<Map<String, Object?>> get visibleEvents => events.where((event) {
+        final matchesCategory = filter == 'all' || event['category'] == filter;
         if (!matchesCategory) return false;
         if (searchQuery.trim().isEmpty) return true;
         final query = searchQuery.toLowerCase();
@@ -116,8 +171,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
           '${event['startedAt'] ?? ''}',
           '${event['metadata'] ?? ''}',
         ].join(' ').toLowerCase().contains(query);
-      })
-      .toList(growable: false);
+      }).toList(growable: false);
 
   void _sortEventsByTimestamp() {
     events.sort((left, right) {
@@ -130,7 +184,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     });
   }
 
-  int get errorCount => events.where((event) => event['success'] == false).length;
+  int get errorCount =>
+      events.where((event) => event['success'] == false).length;
 
   double get averageDuration {
     final durations = _durations;
@@ -162,6 +217,25 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
         .where((event) => (event['metadata'] as Map?)?['hit'] == true)
         .length;
     return '${(hits * 100 / total).toStringAsFixed(0)}%';
+  }
+
+  int get requestsPerMinute {
+    final DateTime cutoff = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 1),
+        );
+    return events.where((event) {
+      final started = DateTime.tryParse('${event['startedAt']}')?.toUtc();
+      return started != null && started.isAfter(cutoff);
+    }).length;
+  }
+
+  Map<String, int> get eventCountsByCategory {
+    final counts = <String, int>{};
+    for (final event in events) {
+      final category = '${event['category'] ?? 'unknown'}';
+      counts[category] = (counts[category] ?? 0) + 1;
+    }
+    return counts;
   }
 
   @override
@@ -220,6 +294,16 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
             onPressed: events.isEmpty ? null : clearEvents,
             icon: const Icon(Icons.delete_outline),
           ),
+          IconButton(
+            tooltip: 'Copy visible events',
+            onPressed: visibleEvents.isEmpty ? null : exportEvents,
+            icon: const Icon(Icons.file_download_outlined),
+          ),
+          IconButton(
+            tooltip: 'Import NDJSON from clipboard',
+            onPressed: importEventsFromClipboard,
+            icon: const Icon(Icons.file_upload_outlined),
+          ),
           const SizedBox(width: 12),
         ],
       ),
@@ -271,8 +355,15 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
                 value: cacheHitRatio,
                 icon: Icons.cached,
               ),
+              DrocketDiagnosticMetricCard(
+                label: 'Requests / minute',
+                value: '$requestsPerMinute',
+                icon: Icons.timeline,
+              ),
             ],
           ),
+          const SizedBox(height: 12),
+          _buildBufferSummary(context),
           const SizedBox(height: 24),
           if (loading)
             const LinearProgressIndicator()
@@ -286,6 +377,19 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBufferSummary(BuildContext context) {
+    final counts = eventCountsByCategory.entries
+        .map((entry) => '${entry.key}: ${entry.value}')
+        .join('   ');
+    return Text(
+      'Buffer ${events.length}/$bufferCapacity  •  '
+      '${diagnosticsEnabled ? 'enabled' : 'disabled'}'
+      '${includeSensitiveData ? '  •  sensitive payloads enabled' : ''}'
+      '${counts.isEmpty ? '' : '  •  $counts'}',
+      style: Theme.of(context).textTheme.bodySmall,
     );
   }
 

@@ -27,5 +27,14 @@ flutter run
 ```
 
 While the app is running in debug mode, open Flutter DevTools and select the
-`d_rocket` tab. Press the buttons in the example app, then refresh the tab to
-inspect the REST, SQLite/LINQ, migration, sync, and realtime events.
+`d_rocket` tab. Press the buttons in the example app and the events should
+appear without polling. The panel reconnects after a VM Service interruption,
+sorts by timestamp, and opens structured details for REST, SQLite/LINQ,
+migration, sync, cache, and realtime events.
+
+The download button copies the visible events as JSON. The upload button reads
+NDJSON from the clipboard, so output created by
+`d_rocket:migration --diagnostics-file` can be inspected in the same timeline.
+Bodies, authorization headers, cookies, API keys, and SQL bind values remain
+hidden or redacted unless sensitive diagnostics were explicitly enabled in the
+application.

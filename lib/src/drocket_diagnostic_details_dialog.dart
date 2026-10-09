@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'drocket_diagnostic_category_badge.dart';
 import 'drocket_diagnostic_formatters.dart';
@@ -139,9 +140,8 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
   }
 
   Widget _payloadPanel(BuildContext context, String title, Object? value) {
-    final payload = value is Map
-        ? value.cast<String, Object?>()
-        : <String, Object?>{};
+    final payload =
+        value is Map ? value.cast<String, Object?>() : <String, Object?>{};
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -153,7 +153,19 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          Row(
+            children: <Widget>[
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Copy $title',
+                onPressed: payload.isEmpty
+                    ? null
+                    : () => _copyPayload(context, payload),
+                icon: const Icon(Icons.copy, size: 17),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           if (payload.isEmpty)
             const Text('No data available')
@@ -161,7 +173,11 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
             ...payload.entries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 7),
-                child: _detail(context, _labelFor(entry.key), '${entry.value}'),
+                child: _detail(
+                  context,
+                  _labelFor(entry.key),
+                  formatDiagnosticValue(entry.value),
+                ),
               ),
             ),
           if (payload['bodyTruncated'] == true)
@@ -174,12 +190,31 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
     );
   }
 
+  Future<void> _copyPayload(
+    BuildContext context,
+    Map<String, Object?> payload,
+  ) async {
+    await Clipboard.setData(
+      ClipboardData(text: formatDiagnosticValue(payload)),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Payload copied to clipboard')),
+    );
+  }
+
   List<String> get _keysForCategory {
     switch (category) {
       case 'rest':
         return <String>['url', 'method', 'headers'];
       case 'database':
-        return <String>['sql', 'rowCount'];
+        return <String>[
+          'sql',
+          'sqlKind',
+          'bindCount',
+          'bindTypes',
+          'rowCount',
+        ];
       case 'migration':
         return <String>['id', 'name', 'steps'];
       case 'sync':
