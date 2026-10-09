@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devtools_extensions/devtools_extensions.dart';
 import 'package:flutter/material.dart';
 
@@ -10,11 +12,34 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   String filter = 'all';
   String? error;
   bool loading = true;
+  StreamSubscription<dynamic>? eventSubscription;
 
   @override
   void initState() {
     super.initState();
     loadSnapshot();
+    listenToDiagnosticEvents();
+  }
+
+  Future<void> listenToDiagnosticEvents() async {
+    try {
+      final service = await serviceManager.onServiceAvailable;
+      if (!mounted) return;
+      await eventSubscription?.cancel();
+      eventSubscription = service.onExtensionEvent.listen((event) {
+        if (event.extensionKind != 'd_rocket.diagnostic') return;
+        final dynamic data = event.extensionData?.data;
+        if (data is! Map) return;
+        final diagnostic = data.cast<String, Object?>();
+        if (!mounted) return;
+        setState(() {
+          events.insert(0, diagnostic);
+          if (events.length > 500) events.removeLast();
+        });
+      });
+    } catch (_) {
+      // The refresh action remains available when VM Service is unavailable.
+    }
   }
 
   Future<void> loadSnapshot() async {
@@ -48,6 +73,12 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
       'ext.d_rocket.diagnostics.clear',
     );
     setState(events.clear);
+  }
+
+  @override
+  void dispose() {
+    eventSubscription?.cancel();
+    super.dispose();
   }
 
   List<Map<String, Object?>> get visibleEvents => events

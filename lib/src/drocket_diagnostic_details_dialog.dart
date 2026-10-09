@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'drocket_diagnostic_category_badge.dart';
+import 'drocket_diagnostic_formatters.dart';
 
 class DrocketDiagnosticDetailsDialog extends StatelessWidget {
   const DrocketDiagnosticDetailsDialog({super.key, required this.event});
@@ -86,16 +87,19 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
   }
 
   Widget _summaryGrid(BuildContext context, bool success) {
-    final duration = event['durationMicros'];
-    final durationLabel = duration is num
-        ? '${(duration.toDouble() / 1000).toStringAsFixed(1)} ms'
+    final durationLabel = event['durationMicros'] is num
+        ? formatDiagnosticDuration(event['durationMicros'])
         : 'Not measured';
     return Wrap(
       spacing: 28,
       runSpacing: 12,
       children: <Widget>[
         _detail(context, 'Status', success ? 'Success' : 'Failed'),
-        _detail(context, 'Started', '${event['startedAt'] ?? 'Unknown'}'),
+        _detail(
+          context,
+          'Date and time',
+          formatDiagnosticTimestamp(event['startedAt']),
+        ),
         _detail(context, 'Duration', durationLabel),
         if (event['statusCode'] != null)
           _detail(context, 'HTTP status', '${event['statusCode']}'),

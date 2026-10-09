@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'drocket_diagnostic_category_badge.dart';
 import 'drocket_diagnostic_details_dialog.dart';
+import 'drocket_diagnostic_formatters.dart';
 
 class DrocketDiagnosticEventTile extends StatelessWidget {
   const DrocketDiagnosticEventTile({super.key, required this.event});
@@ -11,10 +12,7 @@ class DrocketDiagnosticEventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool success = event['success'] != false;
-    final duration = event['durationMicros'];
-    final durationLabel = duration is num
-        ? '${(duration.toDouble() / 1000).toStringAsFixed(1)} ms'
-        : '—';
+    final durationLabel = formatDiagnosticDuration(event['durationMicros']);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -37,10 +35,20 @@ class DrocketDiagnosticEventTile extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  '${event['operation'] ?? 'unknown'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '${event['operation'] ?? 'unknown'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      formatDiagnosticTimestamp(event['startedAt']),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 14),
