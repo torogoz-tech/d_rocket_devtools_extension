@@ -9,7 +9,9 @@ import 'drocket_diagnostics_screen.dart';
 
 class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   final List<Map<String, Object?>> events = <Map<String, Object?>>[];
+  final TextEditingController searchController = TextEditingController();
   String filter = 'all';
+  String searchQuery = '';
   String? error;
   bool loading = true;
   bool connected = false;
@@ -97,11 +99,24 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   void dispose() {
     eventSubscription?.cancel();
     serviceManager.connectedState.removeListener(_handleConnectionStateChange);
+    searchController.dispose();
     super.dispose();
   }
 
   List<Map<String, Object?>> get visibleEvents => events
-      .where((event) => filter == 'all' || event['category'] == filter)
+      .where((event) {
+        final matchesCategory =
+            filter == 'all' || event['category'] == filter;
+        if (!matchesCategory) return false;
+        if (searchQuery.trim().isEmpty) return true;
+        final query = searchQuery.toLowerCase();
+        return <String>[
+          '${event['operation'] ?? ''}',
+          '${event['category'] ?? ''}',
+          '${event['startedAt'] ?? ''}',
+          '${event['metadata'] ?? ''}',
+        ].join(' ').toLowerCase().contains(query);
+      })
       .toList(growable: false);
 
   void _sortEventsByTimestamp() {
@@ -118,13 +133,35 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   int get errorCount => events.where((event) => event['success'] == false).length;
 
   double get averageDuration {
-    final durations = events
-        .map((event) => event['durationMicros'])
-        .whereType<num>()
-        .map((value) => value.toDouble() / 1000)
-        .toList(growable: false);
+    final durations = _durations;
     if (durations.isEmpty) return 0;
     return durations.reduce((left, right) => left + right) / durations.length;
+  }
+
+  List<double> get _durations => events
+      .map((event) => event['durationMicros'])
+      .whereType<num>()
+      .map((value) => value.toDouble() / 1000)
+      .toList(growable: false);
+
+  double _percentile(double percentile) {
+    final durations = <double>[..._durations]..sort();
+    if (durations.isEmpty) return 0;
+    final index = ((durations.length - 1) * percentile).round();
+    return durations[index];
+  }
+
+  double get p50Duration => _percentile(0.50);
+  double get p95Duration => _percentile(0.95);
+
+  String get cacheHitRatio {
+    final cacheEvents = events.where((event) => event['category'] == 'cache');
+    final total = cacheEvents.length;
+    if (total == 0) return '—';
+    final hits = cacheEvents
+        .where((event) => (event['metadata'] as Map?)?['hit'] == true)
+        .length;
+    return '${(hits * 100 / total).toStringAsFixed(0)}%';
   }
 
   @override
@@ -143,6 +180,19 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
           ),
           const SizedBox(width: 12),
           SizedBox(
+            width: 230,
+            child: TextField(
+              controller: searchController,
+              decoration: const InputDecoration(
+                hintText: 'Search events',
+                prefixIcon: Icon(Icons.search, size: 18),
+                isDense: true,
+              ),
+              onChanged: (value) => setState(() => searchQuery = value),
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
             width: 150,
             child: DropdownButton<String>(
               isExpanded: true,
@@ -151,6 +201,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
                 DropdownMenuItem(value: 'all', child: Text('All events')),
                 DropdownMenuItem(value: 'rest', child: Text('REST')),
                 DropdownMenuItem(value: 'database', child: Text('Database')),
+                DropdownMenuItem(value: 'linq', child: Text('LINQ')),
                 DropdownMenuItem(value: 'migration', child: Text('Migration')),
                 DropdownMenuItem(value: 'sync', child: Text('Sync')),
                 DropdownMenuItem(value: 'cache', child: Text('Cache')),
@@ -204,6 +255,21 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
                 value: '$errorCount',
                 icon: Icons.error_outline,
                 accent: errorCount > 0 ? Colors.redAccent : Colors.green,
+              ),
+              DrocketDiagnosticMetricCard(
+                label: 'P50 duration',
+                value: '${p50Duration.toStringAsFixed(1)} ms',
+                icon: Icons.speed,
+              ),
+              DrocketDiagnosticMetricCard(
+                label: 'P95 duration',
+                value: '${p95Duration.toStringAsFixed(1)} ms',
+                icon: Icons.insights,
+              ),
+              DrocketDiagnosticMetricCard(
+                label: 'Cache hit ratio',
+                value: cacheHitRatio,
+                icon: Icons.cached,
               ),
             ],
           ),
