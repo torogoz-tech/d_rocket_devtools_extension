@@ -9,7 +9,7 @@ Build and copy the extension with:
 ```bash
 dart run devtools_extensions build_and_copy \
   --source=. \
-  --dest=../d_rocket/extension/devtools
+  --dest=extension/devtools
 ```
 
 ## Integration example

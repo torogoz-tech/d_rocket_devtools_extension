@@ -1,7 +1,10 @@
 name: d_rocket_devtools_extension
 description: DevTools extension for inspecting d_rocket runtime diagnostics.
-publish_to: none
 version: 0.2.0
+repository: https://github.com/torogoz-tech/d_rocket_devtools_extension
+homepage: https://github.com/torogoz-tech/d_rocket_devtools_extension
+issue_tracker: https://github.com/torogoz-tech/d_rocket_devtools_extension/issues
+documentation: https://github.com/torogoz-tech/d_rocket_devtools_extension#readme
 
 environment:
   sdk: ^3.6.0
