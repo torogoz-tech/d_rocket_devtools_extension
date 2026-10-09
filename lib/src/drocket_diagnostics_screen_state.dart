@@ -238,6 +238,20 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     return counts;
   }
 
+  List<int> get timelineBuckets {
+    final now = DateTime.now().toUtc();
+    final buckets = List<int>.filled(10, 0);
+    for (final event in events) {
+      final started = DateTime.tryParse('${event['startedAt']}')?.toUtc();
+      if (started == null) continue;
+      final secondsAgo = now.difference(started).inSeconds;
+      if (secondsAgo < 0 || secondsAgo >= 600) continue;
+      final index = 9 - (secondsAgo ~/ 60);
+      buckets[index]++;
+    }
+    return buckets;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -364,6 +378,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
           ),
           const SizedBox(height: 12),
           _buildBufferSummary(context),
+          const SizedBox(height: 14),
+          _buildTimelineChart(context),
           const SizedBox(height: 24),
           if (loading)
             const LinearProgressIndicator()
@@ -390,6 +406,49 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
       '${includeSensitiveData ? '  •  sensitive payloads enabled' : ''}'
       '${counts.isEmpty ? '' : '  •  $counts'}',
       style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+
+  Widget _buildTimelineChart(BuildContext context) {
+    final buckets = timelineBuckets;
+    final maximum =
+        buckets.fold<int>(0, (max, value) => value > max ? value : max);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Events per minute (last 10 minutes)',
+                style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 46,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  for (final value in buckets)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: FractionallySizedBox(
+                          heightFactor: maximum == 0 ? 0.04 : value / maximum,
+                          alignment: Alignment.bottomCenter,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
