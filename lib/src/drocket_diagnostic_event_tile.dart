@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import 'drocket_diagnostic_category_badge.dart';
+import 'drocket_diagnostic_details_dialog.dart';
 
 class DrocketDiagnosticEventTile extends StatelessWidget {
   const DrocketDiagnosticEventTile({super.key, required this.event});
@@ -18,33 +17,42 @@ class DrocketDiagnosticEventTile extends StatelessWidget {
         : '—';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        leading: Icon(
-          success ? Icons.check_circle_outline : Icons.error_outline,
-          color: success ? Colors.green : Colors.redAccent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => showDialog<void>(
+          context: context,
+          builder: (_) => DrocketDiagnosticDetailsDialog(event: event),
         ),
-        title: Row(
-          children: <Widget>[
-            DrocketDiagnosticCategoryBadge(
-              category: '${event['category'] ?? 'unknown'}',
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text('${event['operation'] ?? 'unknown'}')),
-          ],
-        ),
-        subtitle: Text('${event['startedAt'] ?? 'Unknown time'} · $durationLabel'),
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SelectableText(
-                const JsonEncoder.withIndent('  ').convert(event),
-                style: Theme.of(context).textTheme.bodySmall,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                success ? Icons.check_circle_outline : Icons.error_outline,
+                color: success ? Colors.green : Colors.redAccent,
               ),
-            ),
+              const SizedBox(width: 14),
+              DrocketDiagnosticCategoryBadge(
+                category: '${event['category'] ?? 'unknown'}',
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  '${event['operation'] ?? 'unknown'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                durationLabel,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.chevron_right, size: 20),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
