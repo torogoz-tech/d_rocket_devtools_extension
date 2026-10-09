@@ -108,6 +108,9 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
   }
 
   Widget _categoryDetails(BuildContext context) {
+    if (category == 'rest') {
+      return _restDetails(context);
+    }
     final keys = _keysForCategory;
     final details = keys
         .where((key) => metadata[key] != null)
@@ -117,6 +120,48 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
       return _valuePanel(context, 'No additional details were recorded.');
     }
     return Wrap(spacing: 28, runSpacing: 14, children: details);
+  }
+
+  Widget _restDetails(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _payloadPanel(context, 'Request', metadata['request']),
+        const SizedBox(height: 12),
+        _payloadPanel(context, 'Response', metadata['response']),
+      ],
+    );
+  }
+
+  Widget _payloadPanel(BuildContext context, String title, Object? value) {
+    final payload = value is Map
+        ? value.cast<String, Object?>()
+        : <String, Object?>{};
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 10),
+          if (payload.isEmpty)
+            const Text('No data available')
+          else
+            ...payload.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: _detail(context, _labelFor(entry.key), '${entry.value}'),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   List<String> get _keysForCategory {
