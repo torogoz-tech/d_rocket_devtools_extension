@@ -9,7 +9,7 @@ void main() {
     DrocketDiagnostics.instance.clear();
 
     await tester.pumpWidget(const DrocketIntegrationApp());
-    await tester.tap(find.text('REST'));
+    await tester.tap(find.text('REST POST'));
     await tester.pump();
 
     expect(find.text('Events sent: 1'), findsOneWidget);

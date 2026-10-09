@@ -171,13 +171,13 @@ class DrocketDiagnosticDetailsDialog extends StatelessWidget {
       case 'database':
         return <String>['sql', 'rowCount'];
       case 'migration':
-        return <String>['id', 'name'];
+        return <String>['id', 'name', 'steps'];
       case 'sync':
-        return <String>['since'];
+        return <String>['since', 'uploaded', 'downloaded'];
       case 'cache':
         return <String>['key', 'hit', 'etag'];
       case 'realtime':
-        return <String>['channel', 'messageType'];
+        return <String>['channel', 'messageType', 'payloadSize'];
       default:
         return metadata.keys.toList(growable: false);
     }
