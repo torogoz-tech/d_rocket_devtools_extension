@@ -5,12 +5,14 @@ import 'package:devtools_extensions/devtools_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'drocket_diagnostic_event_buffer.dart';
 import 'drocket_diagnostic_event_tile.dart';
 import 'drocket_diagnostic_metric_card.dart';
 import 'drocket_diagnostics_screen.dart';
 
 class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
-  final List<Map<String, Object?>> events = <Map<String, Object?>>[];
+  final DrocketDiagnosticEventBuffer eventBuffer =
+      DrocketDiagnosticEventBuffer();
   final TextEditingController searchController = TextEditingController();
   String filter = 'all';
   String searchQuery = '';
@@ -21,6 +23,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
   bool includeSensitiveData = false;
   int bufferCapacity = 500;
   StreamSubscription<dynamic>? eventSubscription;
+
+  List<Map<String, Object?>> get events => eventBuffer.items;
 
   @override
   void initState() {
@@ -51,9 +55,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
         if (!mounted) return;
         if (_hasEvent(diagnostic)) return;
         setState(() {
-          events.insert(0, diagnostic);
-          if (events.length > 500) events.removeLast();
-          _sortEventsByTimestamp();
+          eventBuffer.add(diagnostic);
         });
       });
     } catch (_) {
@@ -61,10 +63,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     }
   }
 
-  bool _hasEvent(Map<String, Object?> candidate) {
-    final id = candidate['id'];
-    return id != null && events.any((event) => event['id'] == id);
-  }
+  bool _hasEvent(Map<String, Object?> candidate) =>
+      eventBuffer.contains(candidate);
 
   Future<void> loadSnapshot() async {
     setState(() {
@@ -86,12 +86,9 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
       if (rawSensitive is bool) includeSensitiveData = rawSensitive;
       if (rawEvents is List) {
         setState(() {
-          events
-            ..clear()
-            ..addAll(rawEvents.whereType<Map>().map(
-                  (event) => event.cast<String, Object?>(),
-                ));
-          _sortEventsByTimestamp();
+          eventBuffer.replaceAll(rawEvents.whereType<Map>().map(
+                (event) => event.cast<String, Object?>(),
+              ));
         });
       }
     } catch (value) {
@@ -105,7 +102,7 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     await serviceManager.callServiceExtensionOnMainIsolate(
       'ext.d_rocket.diagnostics.clear',
     );
-    setState(events.clear);
+    setState(eventBuffer.clear);
   }
 
   Future<void> exportEvents() async {
@@ -139,12 +136,8 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
     if (imported.isEmpty) return;
     setState(() {
       for (final event in imported) {
-        if (!_hasEvent(event)) events.add(event);
+        eventBuffer.add(event);
       }
-      if (events.length > bufferCapacity) {
-        events.removeRange(0, events.length - bufferCapacity);
-      }
-      _sortEventsByTimestamp();
     });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -172,17 +165,6 @@ class DrocketDiagnosticsScreenState extends State<DrocketDiagnosticsScreen> {
           '${event['metadata'] ?? ''}',
         ].join(' ').toLowerCase().contains(query);
       }).toList(growable: false);
-
-  void _sortEventsByTimestamp() {
-    events.sort((left, right) {
-      final leftTime = DateTime.tryParse('${left['startedAt']}');
-      final rightTime = DateTime.tryParse('${right['startedAt']}');
-      if (leftTime == null && rightTime == null) return 0;
-      if (leftTime == null) return 1;
-      if (rightTime == null) return -1;
-      return rightTime.compareTo(leftTime);
-    });
-  }
 
   int get errorCount =>
       events.where((event) => event['success'] == false).length;
